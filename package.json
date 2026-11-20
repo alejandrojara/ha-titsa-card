@@ -1,0 +1,33 @@
+{
+  "name": "ha-titsa-card",
+  "version": "20261120.0",
+  "description": "Unofficial Lovelace bus-shelter marquee card for TITSA (Tenerife) in Home Assistant",
+  "type": "module",
+  "main": "dist/ha-titsa-card.js",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "home-assistant",
+    "lovelace",
+    "hacs",
+    "titsa",
+    "tenerife",
+    "public-transport"
+  ],
+  "author": "Alejandro Jara",
+  "license": "MIT",
+  "dependencies": {
+    "lit": "^3.2.1"
+  },
+  "devDependencies": {
+    "happy-dom": "^17.4.4",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.8"
+  }
+}
