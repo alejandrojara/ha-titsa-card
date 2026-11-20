@@ -165,17 +165,24 @@ describe("ha-titsa-card", () => {
       entity_id: "button.tres_de_mayo_9386_actualizar",
     });
 
-    // Simulate cooldown error on subsequent click
-    hass.callService = vi
-      .fn()
-      .mockRejectedValue(new Error("Espera 25 segundos antes de volver a actualizar."));
+    // Simulate real Home Assistant WebSocket HomeAssistantError payload
+    // (HA sends English fallback in `message` + `translation_key` for frontend localization)
+    hass.callService = vi.fn().mockRejectedValue({
+      code: "home_assistant_error",
+      message: "Please wait 25 seconds before refreshing this stop again.",
+      translation_domain: "titsa",
+      translation_key: "refresh_cooldown",
+      translation_placeholders: { seconds: "25" },
+    });
     (card as unknown as { _refreshing: boolean })._refreshing = false;
     await card.updateComplete;
     cta.click();
     await new Promise((r) => setTimeout(r, 10));
     await card.updateComplete;
 
-    expect(root.querySelector(".notice")?.textContent).toContain("Espera 25 segundos");
+    expect(root.querySelector(".notice")?.textContent).toContain(
+      "Espera 25 segundos antes de volver a actualizar esta parada.",
+    );
   });
 
   it("supports card-level line filtering, dark mode class, and English localization", async () => {

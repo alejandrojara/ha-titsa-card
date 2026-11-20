@@ -13,17 +13,38 @@ export interface HassEntityRegistryDisplayEntry {
   name?: string;
 }
 
+export interface HassServiceError {
+  code?: string;
+  message?: string;
+  translation_domain?: string;
+  translation_key?: string;
+  translation_placeholders?: Record<string, string | number>;
+}
+
+export interface CustomCardRegistration {
+  type: string;
+  name: string;
+  description: string;
+  preview?: boolean;
+  documentationURL?: string;
+}
+
 export interface HomeAssistant {
   states: Record<string, HassEntity | undefined>;
   entities?: Record<string, HassEntityRegistryDisplayEntry | undefined>;
   language?: string;
+  selectedLanguage?: string | null;
   locale?: {
     language?: string;
     time_format?: string;
   };
+  config?: {
+    language?: string;
+  };
   themes?: {
     darkMode?: boolean;
   };
+  localize?: (key: string, ...args: unknown[]) => string;
   callService: (
     domain: string,
     service: string,

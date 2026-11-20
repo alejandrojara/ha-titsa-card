@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { localize } from "./localize";
+import { localize, syncCustomCardMetadata } from "./localize";
 import type { HomeAssistant, TitsaCardConfig } from "./types";
 import { getAvailableLinesForEntity, normalizeLineCode } from "./utils";
 
@@ -166,6 +166,8 @@ export class HaTitsaCardEditor extends LitElement {
     if (!this.hass || !this._config) {
       return nothing;
     }
+
+    syncCustomCardMetadata(this.hass);
 
     return html`
       <div class="editor">

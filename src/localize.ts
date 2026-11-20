@@ -1,9 +1,12 @@
-import type { HomeAssistant } from "./types";
+import type { CustomCardRegistration, HassServiceError, HomeAssistant } from "./types";
 
 export type SupportedLocale = "es" | "en";
 
-const TRANSLATIONS: Record<SupportedLocale, Record<string, string>> = {
+export const TRANSLATIONS: Record<SupportedLocale, Record<string, string>> = {
   es: {
+    card_name: "Tarjeta de parada TITSA",
+    card_description:
+      "Tarjeta no oficial estilo marquesina para llegadas en tiempo real de TITSA (Tenerife).",
     now: "Ahora",
     min_short: "min",
     stop_prefix: "Parada",
@@ -22,6 +25,8 @@ const TRANSLATIONS: Record<SupportedLocale, Record<string, string>> = {
     show_more: "Ver {count} más",
     show_less: "Ver menos",
     no_refresh_button: "Botón de actualización no encontrado",
+    refresh_cooldown: "Espera {seconds} segundos antes de volver a actualizar esta parada.",
+    refresh_cooldown_one: "Espera 1 segundo antes de volver a actualizar esta parada.",
     refresh_error: "No se pudo actualizar. Espera unos segundos e inténtalo de nuevo.",
     // Editor labels
     editor_entity: "Sensor de parada TITSA",
@@ -39,6 +44,9 @@ const TRANSLATIONS: Record<SupportedLocale, Record<string, string>> = {
     editor_lines: "Filtrar líneas en esta tarjeta (opcional)",
   },
   en: {
+    card_name: "TITSA Bus Stop Card",
+    card_description:
+      "Unofficial bus-shelter marquee card for TITSA (Tenerife) real-time arrivals.",
     now: "Now",
     min_short: "min",
     stop_prefix: "Stop",
@@ -57,6 +65,8 @@ const TRANSLATIONS: Record<SupportedLocale, Record<string, string>> = {
     show_more: "Show {count} more",
     show_less: "Show less",
     no_refresh_button: "Refresh button entity not found",
+    refresh_cooldown: "Please wait {seconds} seconds before refreshing this stop again.",
+    refresh_cooldown_one: "Please wait 1 second before refreshing this stop again.",
     refresh_error: "Unable to refresh right now. Wait a moment and try again.",
     // Editor labels
     editor_entity: "TITSA stop sensor",
@@ -75,13 +85,35 @@ const TRANSLATIONS: Record<SupportedLocale, Record<string, string>> = {
   },
 };
 
+function readStoredHaLanguage(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage?.getItem("selectedLanguage");
+    if (!raw) return undefined;
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "string" && parsed.trim() ? parsed.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolveLocale(hass?: HomeAssistant): SupportedLocale {
-  const raw = (
-    hass?.locale?.language ||
-    hass?.language ||
-    (typeof navigator !== "undefined" ? navigator.language : "es")
-  ).toLowerCase();
-  return raw.startsWith("es") ? "es" : "en";
+  const candidates: Array<string | null | undefined> = [
+    hass?.selectedLanguage,
+    hass?.language,
+    hass?.locale?.language,
+    hass?.config?.language,
+    readStoredHaLanguage(),
+    typeof document !== "undefined" ? document.documentElement?.lang : undefined,
+    typeof navigator !== "undefined" ? navigator.language : undefined,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      const lower = candidate.trim().toLowerCase();
+      return lower.startsWith("es") ? "es" : "en";
+    }
+  }
+  return "es";
 }
 
 export function localize(
@@ -97,4 +129,85 @@ export function localize(
     }
   }
   return text;
+}
+
+function formatCooldownMessage(hass: HomeAssistant | undefined, rawSeconds: unknown): string {
+  const parsed = Number.parseInt(String(rawSeconds ?? ""), 10);
+  if (!Number.isNaN(parsed) && parsed <= 1) {
+    return localize(hass, "refresh_cooldown_one");
+  }
+  const seconds = !Number.isNaN(parsed) && parsed > 0 ? parsed : 30;
+  return localize(hass, "refresh_cooldown", { seconds });
+}
+
+/**
+ * Localize errors returned by Home Assistant's callService WebSocket command.
+ * HA always places the English fallback in `err.message` and passes
+ * `translation_domain`, `translation_key`, and `translation_placeholders`
+ * so the frontend can translate into the user's active UI language.
+ */
+export function formatServiceError(hass: HomeAssistant | undefined, err: unknown): string {
+  if (err && typeof err === "object") {
+    const haErr = err as HassServiceError;
+
+    // 1. Direct match for ha-titsa's cooldown exception
+    if (haErr.translation_domain === "titsa" && haErr.translation_key === "refresh_cooldown") {
+      return formatCooldownMessage(hass, haErr.translation_placeholders?.seconds);
+    }
+
+    // 2. Delegate other translated HA exceptions to hass.localize when loaded
+    if (
+      haErr.translation_domain &&
+      haErr.translation_key &&
+      typeof hass?.localize === "function"
+    ) {
+      const translated = hass.localize(
+        `component.${haErr.translation_domain}.exceptions.${haErr.translation_key}.message`,
+        haErr.translation_placeholders ?? {},
+      );
+      if (translated && translated.trim()) {
+        return translated;
+      }
+    }
+
+    // 3. Fallback parsing on English/Spanish message text
+    if (typeof haErr.message === "string" && haErr.message.trim()) {
+      const rawMsg = haErr.message.trim();
+      const cooldownMatch = rawMsg.match(/(?:please\s+wait|espera)\s+(\d+)\s+second|espera\s+(\d+)\s+segundo/i);
+      if (cooldownMatch) {
+        return formatCooldownMessage(hass, cooldownMatch[1] ?? cooldownMatch[2]);
+      }
+      if (/not found/i.test(rawMsg)) {
+        return localize(hass, "no_refresh_button");
+      }
+      if (
+        resolveLocale(hass) === "es" &&
+        /^(?:failed to|unable to|error fetching|rate limited|service .+ not found|action .+ not found)/i.test(
+          rawMsg,
+        )
+      ) {
+        return localize(hass, "refresh_error");
+      }
+      return rawMsg;
+    }
+  }
+
+  return localize(hass, "refresh_error");
+}
+
+declare global {
+  interface Window {
+    customCards?: CustomCardRegistration[];
+  }
+}
+
+/** Keep the Home Assistant card picker entry localized to the active UI language. */
+export function syncCustomCardMetadata(hass?: HomeAssistant): void {
+  if (typeof window === "undefined" || !Array.isArray(window.customCards)) return;
+  const entry = window.customCards.find((card) => card.type === "ha-titsa-card");
+  if (!entry) return;
+  const name = localize(hass, "card_name");
+  const description = localize(hass, "card_description");
+  if (entry.name !== name) entry.name = name;
+  if (entry.description !== description) entry.description = description;
 }

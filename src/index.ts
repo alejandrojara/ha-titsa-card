@@ -1,33 +1,19 @@
 import "./editor";
 import "./ha-titsa-card";
+import { localize } from "./localize";
 
 export { HaTitsaCardEditor } from "./editor";
 export { HaTitsaCard } from "./ha-titsa-card";
 export * from "./types";
 
-export const CARD_VERSION = "20261120.0";
-
-interface CustomCardRegistration {
-  type: string;
-  name: string;
-  description: string;
-  preview?: boolean;
-  documentationURL?: string;
-}
-
-declare global {
-  interface Window {
-    customCards?: CustomCardRegistration[];
-  }
-}
+export const CARD_VERSION = "20261120.1";
 
 window.customCards = window.customCards || [];
 if (!window.customCards.some((card) => card.type === "ha-titsa-card")) {
   window.customCards.push({
     type: "ha-titsa-card",
-    name: "TITSA Bus Stop Card",
-    description:
-      "Unofficial bus-shelter marquee card for TITSA (Tenerife) real-time arrivals.",
+    name: localize(undefined, "card_name"),
+    description: localize(undefined, "card_description"),
     preview: true,
     documentationURL: "https://github.com/alejandrojara/ha-titsa-card",
   });

@@ -68,7 +68,7 @@ Necesitas tener instalada y configurada la integración comunitaria **[`alejandr
 ### Editor visual (recomendado)
 
 1. Edita tu panel de Home Assistant y pulsa **Añadir tarjeta**.
-2. Busca **`TITSA Bus Stop Card`**.
+2. Busca **`Tarjeta de parada TITSA`** *(o **`TITSA Bus Stop Card`** si usas Home Assistant en inglés)*.
 3. Selecciona tu sensor de parada TITSA y ajusta el estilo (`marquesina` o `minimal`), el número máximo de llegadas, el modo compacto, las líneas a mostrar o la hora estimada (`HH:MM`).
 
 ### Configuración en YAML

@@ -1,6 +1,11 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { localize, resolveLocale } from "./localize";
+import {
+  formatServiceError,
+  localize,
+  resolveLocale,
+  syncCustomCardMetadata,
+} from "./localize";
 import { cardStyles } from "./styles";
 import type {
   HomeAssistant,
@@ -168,11 +173,7 @@ export class HaTitsaCard extends LitElement {
       });
       this._nowMs = Date.now();
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err && typeof err.message === "string"
-          ? err.message
-          : localize(this.hass, "refresh_error");
-      this._showNotice(msg);
+      this._showNotice(formatServiceError(this.hass, err));
     } finally {
       if (this._refreshTimer !== undefined) {
         window.clearTimeout(this._refreshTimer);
@@ -245,6 +246,7 @@ export class HaTitsaCard extends LitElement {
   protected render() {
     if (!this._config) return nothing;
 
+    syncCustomCardMetadata(this.hass);
     const locale = resolveLocale(this.hass);
     const entityObj =
       this.hass && this._config.entity ? this.hass.states[this._config.entity] : undefined;
