@@ -131,6 +131,33 @@ export function computeLiveMinutes(arrival: TitsaArrival, nowMs: number = Date.n
   return Math.max(0, Math.round(arrival.minutes ?? 0));
 }
 
+/** Return true if an arrival's estimated timestamp is well in the past (>90 s ago). */
+export function isArrivalExpired(
+  arrival: TitsaArrival,
+  nowMs: number = Date.now(),
+  graceSeconds: number = 90,
+): boolean {
+  if (!arrival.estimated_arrival) return false;
+  const targetMs = Date.parse(arrival.estimated_arrival);
+  if (Number.isNaN(targetMs)) return false;
+  return (targetMs - nowMs) / 1000 < -graceSeconds;
+}
+
+/**
+ * Defense-in-depth freshness check for paused manual snapshots (backend TTL is 180 s;
+ * allow 240 s here to account for TITSA estimation clock lag / device clock skew).
+ */
+export function isPausedSnapshotStale(
+  lastEstimation: string | null | undefined,
+  nowMs: number = Date.now(),
+  maxAgeMs: number = 4 * 60_000,
+): boolean {
+  if (!lastEstimation) return false;
+  const estMs = Date.parse(lastEstimation);
+  if (Number.isNaN(estMs)) return false;
+  return nowMs - estMs > maxAgeMs;
+}
+
 /** Format an ISO8601 timestamp as local HH:MM clock time. */
 export function formatClockTime(iso: string | null | undefined, locale: string): string {
   if (!iso) return "";

@@ -6,7 +6,9 @@ import {
   findDefaultTitsaSensor,
   findRefreshButtonEntity,
   formatDestination,
+  isArrivalExpired,
   isNightLine,
+  isPausedSnapshotStale,
   normalizeLineCode,
 } from "../src/utils";
 
@@ -38,7 +40,7 @@ describe("utils", () => {
     expect(formatDestination("Intercambiador Laguna")).toBe("Intercambiador Laguna");
   });
 
-  it("computes live ticking countdown minutes from estimated_arrival", () => {
+  it("computes live ticking countdown minutes and expires departed buses / stale paused snapshots", () => {
     const baseMs = Date.parse("2026-11-20T13:55:00Z");
     const arrival: TitsaArrival = {
       line: "238",
@@ -50,9 +52,19 @@ describe("utils", () => {
     expect(computeLiveMinutes(arrival, baseMs)).toBe(10);
     // 4 minutes later -> ticks down to 6 min locally
     expect(computeLiveMinutes(arrival, baseMs + 4 * 60_000)).toBe(6);
-    // Within 30 seconds or past -> 0 ("Ahora")
+    // Within 30 seconds or shortly past -> 0 ("Ahora") and not expired yet
     expect(computeLiveMinutes(arrival, baseMs + 9.6 * 60_000)).toBe(0);
-    expect(computeLiveMinutes(arrival, baseMs + 12 * 60_000)).toBe(0);
+    expect(isArrivalExpired(arrival, baseMs + 11 * 60_000)).toBe(false);
+    // More than 90 seconds past estimated arrival -> expired
+    expect(isArrivalExpired(arrival, baseMs + 12 * 60_000)).toBe(true);
+
+    // Paused snapshot freshness check (4-minute defense-in-depth threshold)
+    expect(isPausedSnapshotStale("2026-11-22T14:06:00Z", Date.parse("2026-11-22T14:08:30Z"))).toBe(
+      false,
+    );
+    expect(isPausedSnapshotStale("2026-11-22T14:06:00Z", Date.parse("2026-11-22T14:12:00Z"))).toBe(
+      true,
+    );
   });
 
   it("extracts arrivals from both aggregated stop sensors and per-line sensors", () => {

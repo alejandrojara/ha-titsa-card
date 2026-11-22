@@ -1,6 +1,6 @@
 {
   "name": "ha-titsa-card",
-  "version": "20261120.1",
+  "version": "20261122.0",
   "description": "Unofficial Lovelace bus-shelter marquee card for TITSA (Tenerife) in Home Assistant",
   "type": "module",
   "main": "dist/ha-titsa-card.js",

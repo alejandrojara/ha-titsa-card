@@ -21,7 +21,9 @@ import {
   findRefreshButtonEntity,
   formatClockTime,
   formatDestination,
+  isArrivalExpired,
   isNightLine,
+  isPausedSnapshotStale,
   normalizeLineCode,
 } from "./utils";
 
@@ -49,6 +51,12 @@ export class HaTitsaCard extends LitElement {
   private _tickTimer?: number;
   private _noticeTimer?: number;
   private _refreshTimer?: number;
+
+  private _handleVisibilityChange = (): void => {
+    if (typeof document !== "undefined" && !document.hidden) {
+      this._nowMs = Date.now();
+    }
+  };
 
   public static getConfigElement(): HTMLElement {
     return document.createElement("ha-titsa-card-editor");
@@ -88,6 +96,9 @@ export class HaTitsaCard extends LitElement {
     this._tickTimer = window.setInterval(() => {
       this._nowMs = Date.now();
     }, 15_000);
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", this._handleVisibilityChange);
+    }
   }
 
   public disconnectedCallback(): void {
@@ -103,6 +114,9 @@ export class HaTitsaCard extends LitElement {
     if (this._refreshTimer !== undefined) {
       window.clearTimeout(this._refreshTimer);
       this._refreshTimer = undefined;
+    }
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this._handleVisibilityChange);
     }
   }
 
@@ -145,7 +159,9 @@ export class HaTitsaCard extends LitElement {
   private _getFilteredArrivals(): TitsaArrival[] {
     const entityObj =
       this.hass && this._config?.entity ? this.hass.states[this._config.entity] : undefined;
-    const rawArrivals = extractArrivalsFromEntity(entityObj);
+    const rawArrivals = extractArrivalsFromEntity(entityObj).filter(
+      (a) => !isArrivalExpired(a, this._nowMs),
+    );
     const cardLines = this._config?.lines;
     if (!cardLines || cardLines.length === 0) {
       return rawArrivals;
@@ -264,10 +280,16 @@ export class HaTitsaCard extends LitElement {
     const isUnavailable = entityObj?.state === "unavailable";
     const isPaused = Boolean(attrs.polling_paused);
     const isManualSnapshot = Boolean(attrs.manual_snapshot);
+    const isStalePausedSnapshot =
+      isPaused && isPausedSnapshotStale(attrs.last_estimation, this._nowMs);
+    const effectiveManualSnapshot = isManualSnapshot && !isStalePausedSnapshot;
     const arrivals = this._getFilteredArrivals();
+    const showPausedState =
+      isPaused && (isStalePausedSnapshot || (!isManualSnapshot && arrivals.length === 0));
     const maxVisible = this._config.max_arrivals ?? 5;
     const visibleArrivals = this._expanded ? arrivals : arrivals.slice(0, maxVisible);
-    const hiddenCount = Math.max(0, arrivals.length - maxVisible);
+    const hiddenCount =
+      !isUnavailable && !showPausedState ? Math.max(0, arrivals.length - maxVisible) : 0;
 
     const lastUpdateClock = formatClockTime(attrs.last_estimation, locale);
 
@@ -301,7 +323,7 @@ export class HaTitsaCard extends LitElement {
             : nothing}
         </div>
       `;
-    } else if (isPaused && !isManualSnapshot && arrivals.length === 0) {
+    } else if (showPausedState) {
       bodyContent = html`
         <div class="state-box paused">
           <ha-icon icon="mdi:pause-circle-outline"></ha-icon>
@@ -342,7 +364,7 @@ export class HaTitsaCard extends LitElement {
       this._config.show_footer !== false &&
       Boolean(entityObj) &&
       !isUnavailable &&
-      (Boolean(lastUpdateClock) || hiddenCount > 0 || isManualSnapshot);
+      (Boolean(lastUpdateClock) || hiddenCount > 0 || effectiveManualSnapshot);
 
     const themeClass =
       this.hass?.themes?.darkMode === true
@@ -411,7 +433,7 @@ export class HaTitsaCard extends LitElement {
                   ${lastUpdateClock
                     ? html`<span>${localize(this.hass, "updated_at")} ${lastUpdateClock}</span>`
                     : nothing}
-                  ${isManualSnapshot
+                  ${effectiveManualSnapshot
                     ? html`<span class="manual-tag">${localize(this.hass, "manual_badge")}</span>`
                     : nothing}
                 </div>

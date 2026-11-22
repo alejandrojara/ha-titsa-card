@@ -185,6 +185,31 @@ describe("ha-titsa-card", () => {
     );
   });
 
+  it("shows paused state instead of stale arrivals when a paused manual snapshot is older than 4 minutes", async () => {
+    const sixMinAgoIso = new Date(Date.now() - 6 * 60_000).toISOString();
+    const hass = createHass({
+      polling_paused: true,
+      manual_snapshot: true,
+      last_estimation: sixMinAgoIso,
+    });
+    const card = document.createElement("ha-titsa-card") as HaTitsaCard;
+    card.setConfig({
+      type: "custom:ha-titsa-card",
+      entity: "sensor.tres_de_mayo_9386_proxima_guagua",
+      max_arrivals: 2,
+    });
+    card.hass = hass;
+    document.body.appendChild(card);
+    await card.updateComplete;
+
+    const root = card.shadowRoot!;
+    expect(root.querySelector(".state-title")?.textContent).toBe("Sondeo en pausa");
+    expect(root.querySelectorAll(".arrival-row")).toHaveLength(0);
+    expect(root.querySelector(".manual-tag")).toBeNull();
+    expect(root.querySelector(".expand-btn")).toBeNull();
+    expect(root.querySelector(".cta-btn")?.textContent).toContain("Consultar ahora");
+  });
+
   it("supports card-level line filtering, dark mode class, and English localization", async () => {
     const hass = createHass({}, "2026-11-20T13:55:23+00:00", "en");
     hass.themes = { darkMode: true };
