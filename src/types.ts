@@ -105,6 +105,7 @@ export interface TitsaCardConfig {
   show_route_name?: boolean;
   show_footer?: boolean;
   tap_to_refresh?: boolean;
+  open_line_url?: boolean;
   lines?: string[];
 }
 

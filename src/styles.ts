@@ -32,13 +32,8 @@ export const cardStyles = css`
     transition: box-shadow 180ms ease;
   }
 
-  ha-card.interactive {
+  ha-card.card-interactive {
     cursor: pointer;
-  }
-
-  ha-card.interactive:focus-visible {
-    outline: 2px solid var(--titsa-green);
-    outline-offset: 2px;
   }
 
   /* ── Header: Marquesina (TITSA shelter green banner) ── */
@@ -48,6 +43,13 @@ export const cardStyles = css`
     justify-content: space-between;
     gap: 12px;
     padding: 13px 16px;
+    transition:
+      filter 140ms ease,
+      background-color 140ms ease;
+  }
+
+  .header.refresh-zone {
+    cursor: pointer;
   }
 
   .header.marquesina {
@@ -55,11 +57,19 @@ export const cardStyles = css`
     color: #ffffff;
   }
 
+  .header.marquesina.refresh-zone:hover {
+    filter: brightness(1.03);
+  }
+
   .header.minimal {
     background: transparent;
     color: var(--primary-text-color);
     border-bottom: 1px solid var(--divider-color, rgba(127, 127, 127, 0.18));
     padding: 12px 16px 10px;
+  }
+
+  .header.minimal.refresh-zone:hover {
+    background: var(--secondary-background-color, rgba(127, 127, 127, 0.06));
   }
 
   .header-left {
@@ -185,6 +195,15 @@ export const cardStyles = css`
     transform: scale(0.94);
   }
 
+  .refresh-btn:focus-visible {
+    outline: 2px solid var(--titsa-green);
+    outline-offset: 2px;
+  }
+
+  .header.marquesina .refresh-btn:focus-visible {
+    outline-color: #ffffff;
+  }
+
   .refresh-btn:disabled {
     opacity: 0.55;
     cursor: default;
@@ -237,6 +256,15 @@ export const cardStyles = css`
   }
 
   .arrival-row {
+    display: block;
+  }
+
+  .arrival-row + .arrival-row {
+    border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.14));
+  }
+
+  .arrival-link,
+  .arrival-row.static {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -244,17 +272,68 @@ export const cardStyles = css`
     transition: background-color 120ms ease;
   }
 
-  .arrivals.compact .arrival-row {
+  .arrival-link,
+  .arrival-link:visited {
+    width: 100%;
+    box-sizing: border-box;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    padding-right: 10px;
+  }
+
+  .arrivals.compact .arrival-link,
+  .arrivals.compact .arrival-row.static {
     padding: 6px 14px;
     gap: 10px;
   }
 
-  .arrival-row + .arrival-row {
-    border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.14));
+  .arrivals.compact .arrival-link {
+    padding-right: 8px;
   }
 
-  .arrival-row:hover {
-    background: var(--secondary-background-color, rgba(127, 127, 127, 0.06));
+  .arrival-link:hover {
+    background: var(--secondary-background-color, rgba(127, 127, 127, 0.08));
+  }
+
+  .arrival-link:active {
+    background: var(--secondary-background-color, rgba(127, 127, 127, 0.14));
+  }
+
+  .arrival-link:focus-visible {
+    outline: 2px solid var(--titsa-green);
+    outline-offset: -2px;
+    background: var(--secondary-background-color, rgba(127, 127, 127, 0.08));
+  }
+
+  .row-chevron {
+    --mdc-icon-size: 18px;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--secondary-text-color);
+    opacity: 0.45;
+    flex-shrink: 0;
+    margin-left: -4px;
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease,
+      color 120ms ease;
+  }
+
+  .arrivals.compact .row-chevron {
+    --mdc-icon-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+
+  .arrival-link:hover .row-chevron,
+  .arrival-link:focus-visible .row-chevron {
+    opacity: 0.9;
+    color: var(--titsa-urgent-fg);
+    transform: translateX(2px);
   }
 
   .line-pill {
@@ -365,6 +444,11 @@ export const cardStyles = css`
     gap: 6px;
   }
 
+  .state-box[role="button"]:focus-visible {
+    outline: 2px solid var(--titsa-green);
+    outline-offset: -2px;
+  }
+
   .state-box > ha-icon {
     --mdc-icon-size: 28px;
     color: var(--secondary-text-color);
@@ -417,6 +501,11 @@ export const cardStyles = css`
     transform: scale(0.97);
   }
 
+  .cta-btn:focus-visible {
+    outline: 2px solid var(--titsa-green-dark);
+    outline-offset: 2px;
+  }
+
   .cta-btn ha-icon {
     --mdc-icon-size: 16px;
     color: #ffffff;
@@ -434,6 +523,15 @@ export const cardStyles = css`
     border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.14));
     font-size: 0.75rem;
     color: var(--secondary-text-color);
+    transition: background-color 120ms ease;
+  }
+
+  .footer.refresh-zone {
+    cursor: pointer;
+  }
+
+  .footer.refresh-zone:hover {
+    background: var(--secondary-background-color, rgba(127, 127, 127, 0.06));
   }
 
   .footer-left {
@@ -466,5 +564,10 @@ export const cardStyles = css`
 
   .expand-btn:hover {
     background: var(--titsa-green-tint);
+  }
+
+  .expand-btn:focus-visible {
+    outline: 2px solid var(--titsa-green);
+    outline-offset: 2px;
   }
 `;

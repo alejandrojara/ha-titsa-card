@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { HomeAssistant, TitsaArrival } from "../src/types";
 import {
+  TITSA_LINES_INDEX_URL,
+  buildTitsaLineUrl,
   computeLiveMinutes,
   extractArrivalsFromEntity,
   findDefaultTitsaSensor,
@@ -29,6 +31,46 @@ describe("utils", () => {
     expect(normalizeLineCode("030a")).toBe("30A");
     expect(normalizeLineCode("0")).toBe("0");
     expect(normalizeLineCode("  ")).toBe("");
+  });
+
+  it("builds safe 3-digit zero-padded titsa.com line URLs with index fallback for non-numeric codes", () => {
+    expect(buildTitsaLineUrl("15")).toBe(
+      "https://titsa.com/index.php/tus-guaguas/lineas-y-horarios/linea-015",
+    );
+    expect(buildTitsaLineUrl("015")).toBe(
+      "https://titsa.com/index.php/tus-guaguas/lineas-y-horarios/linea-015",
+    );
+    expect(buildTitsaLineUrl(" 10 ")).toBe(
+      "https://titsa.com/index.php/tus-guaguas/lineas-y-horarios/linea-010",
+    );
+    expect(buildTitsaLineUrl("5")).toBe(
+      "https://titsa.com/index.php/tus-guaguas/lineas-y-horarios/linea-005",
+    );
+    expect(buildTitsaLineUrl("905")).toBe(
+      "https://titsa.com/index.php/tus-guaguas/lineas-y-horarios/linea-905",
+    );
+    expect(buildTitsaLineUrl("0975")).toBe(
+      "https://titsa.com/index.php/tus-guaguas/lineas-y-horarios/linea-975",
+    );
+
+    // Non-numeric / special shuttle / zero / malformed inputs fall back safely to the index
+    for (const fallbackInput of [
+      "",
+      "   ",
+      "0",
+      "000",
+      "LANZADERA",
+      "AERO",
+      "L1",
+      "30A",
+      "15/16",
+      "../etc/passwd",
+      "javascript:alert(1)",
+      null,
+      undefined,
+    ]) {
+      expect(buildTitsaLineUrl(fallbackInput)).toBe(TITSA_LINES_INDEX_URL);
+    }
   });
 
   it("formats ALL-CAPS TITSA destinations while preserving acronyms", () => {

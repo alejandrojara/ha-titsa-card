@@ -6,7 +6,7 @@ export { HaTitsaCardEditor } from "./editor";
 export { HaTitsaCard } from "./ha-titsa-card";
 export * from "./types";
 
-export const CARD_VERSION = "20261122.0";
+export const CARD_VERSION = "20261125.0";
 
 window.customCards = window.customCards || [];
 if (!window.customCards.some((card) => card.type === "ha-titsa-card")) {

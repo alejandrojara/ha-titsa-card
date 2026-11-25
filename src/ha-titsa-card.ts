@@ -15,6 +15,7 @@ import type {
   TitsaSensorAttributes,
 } from "./types";
 import {
+  buildTitsaLineUrl,
   computeLiveMinutes,
   extractArrivalsFromEntity,
   findDefaultTitsaSensor,
@@ -35,6 +36,7 @@ const DEFAULT_CONFIG: Omit<TitsaCardConfig, "type" | "entity"> = {
   show_route_name: false,
   show_footer: true,
   tap_to_refresh: true,
+  open_line_url: true,
 };
 
 @customElement("ha-titsa-card")
@@ -70,6 +72,7 @@ export class HaTitsaCard extends LitElement {
       max_arrivals: 5,
       show_footer: true,
       tap_to_refresh: true,
+      open_line_url: true,
     };
   }
 
@@ -87,6 +90,7 @@ export class HaTitsaCard extends LitElement {
       ...config,
       max_arrivals: maxArrivals,
       style: config.style === "minimal" ? "minimal" : "marquesina",
+      open_line_url: config.open_line_url !== false,
     };
   }
 
@@ -201,19 +205,45 @@ export class HaTitsaCard extends LitElement {
     }
   }
 
-  private _handleCardClick(): void {
+  private _isInteractiveChildTarget(ev: Event): boolean {
+    const current = ev.currentTarget;
+    const selector = 'a, button, input, select, textarea, [role="button"]';
+    const path = typeof ev.composedPath === "function" ? ev.composedPath() : [];
+    if (path.length > 0) {
+      for (const node of path) {
+        if (node === current) return false;
+        if (node instanceof Element && node.matches(selector)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    const target = ev.target;
+    if (!(target instanceof Element) || target === current) return false;
+    const interactive = target.closest(selector);
+    return Boolean(interactive && interactive !== current);
+  }
+
+  private _handleRefreshZoneClick(ev: Event): void {
     if (!this._config?.tap_to_refresh) return;
+    if (this._isInteractiveChildTarget(ev)) return;
+    ev.stopPropagation();
     const buttonEntity = findRefreshButtonEntity(this.hass, this._config);
     if (buttonEntity) {
-      void this._triggerRefresh();
+      void this._triggerRefresh(ev);
     }
   }
 
-  private _handleCardKeyDown(ev: KeyboardEvent): void {
+  private _handleRefreshZoneKeyDown(ev: KeyboardEvent): void {
     if (!this._config?.tap_to_refresh) return;
+    if (this._isInteractiveChildTarget(ev)) return;
     if (ev.key === "Enter" || ev.key === " ") {
       ev.preventDefault();
-      this._handleCardClick();
+      ev.stopPropagation();
+      const buttonEntity = findRefreshButtonEntity(this.hass, this._config);
+      if (buttonEntity) {
+        void this._triggerRefresh();
+      }
     }
   }
 
@@ -222,7 +252,7 @@ export class HaTitsaCard extends LitElement {
     this._expanded = !this._expanded;
   }
 
-  private _renderArrivalRow(arrival: TitsaArrival, locale: string) {
+  private _renderArrivalRow(arrival: TitsaArrival, locale: string, openLineUrl: boolean) {
     const minutes = computeLiveMinutes(arrival, this._nowMs);
     const lineCode = normalizeLineCode(String(arrival.line));
     const isNight = isNightLine(lineCode);
@@ -244,17 +274,50 @@ export class HaTitsaCard extends LitElement {
       etaClass = "eta-badge imminent";
     }
 
+    const rowContent = html`
+      <span class="line-pill ${isNight ? "night" : ""}">${lineCode}</span>
+      <div class="dest-col">
+        <div class="destination" title=${dest || nothing}>${dest}</div>
+        ${routeName
+          ? html`<div class="route-sub" title=${routeName || nothing}>${routeName}</div>`
+          : nothing}
+      </div>
+      <div class="eta-col">
+        <span class=${etaClass}>${etaText}</span>
+        ${clock ? html`<span class="eta-clock">${clock}</span>` : nothing}
+      </div>
+    `;
+
+    if (!openLineUrl) {
+      return html`<li class="arrival-row static">${rowContent}</li>`;
+    }
+
+    const lineUrl = buildTitsaLineUrl(arrival.line);
+    const ariaLabel = dest
+      ? localize(this.hass, "open_line_aria", {
+          line: lineCode,
+          destination: dest,
+          eta: etaText,
+        })
+      : localize(this.hass, "open_line_aria_no_dest", {
+          line: lineCode,
+          eta: etaText,
+        });
+    const tooltip = localize(this.hass, "open_line_tooltip", { line: lineCode });
+
     return html`
       <li class="arrival-row">
-        <span class="line-pill ${isNight ? "night" : ""}">${lineCode}</span>
-        <div class="dest-col">
-          <div class="destination" title=${dest}>${dest}</div>
-          ${routeName ? html`<div class="route-sub" title=${routeName}>${routeName}</div>` : nothing}
-        </div>
-        <div class="eta-col">
-          <span class=${etaClass}>${etaText}</span>
-          ${clock ? html`<span class="eta-clock">${clock}</span>` : nothing}
-        </div>
+        <a
+          class="arrival-link"
+          href=${lineUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label=${ariaLabel}
+          title=${tooltip}
+        >
+          ${rowContent}
+          <ha-icon class="row-chevron" icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
+        </a>
       </li>
     `;
   }
@@ -275,7 +338,8 @@ export class HaTitsaCard extends LitElement {
       attrs.friendly_name ||
       (stopId ? `${localize(this.hass, "stop_prefix")} ${stopId}` : "TITSA");
     const refreshButton = findRefreshButtonEntity(this.hass, this._config);
-    const interactive = Boolean(this._config.tap_to_refresh && refreshButton);
+    const canTapRefresh = Boolean(this._config.tap_to_refresh && refreshButton);
+    const openLineUrl = this._config.open_line_url !== false;
 
     const isUnavailable = entityObj?.state === "unavailable";
     const isPaused = Boolean(attrs.polling_paused);
@@ -286,6 +350,10 @@ export class HaTitsaCard extends LitElement {
     const arrivals = this._getFilteredArrivals();
     const showPausedState =
       isPaused && (isStalePausedSnapshot || (!isManualSnapshot && arrivals.length === 0));
+    const hasArrivals =
+      Boolean(entityObj) && !isUnavailable && !showPausedState && arrivals.length > 0;
+    const cardTapRefresh = canTapRefresh && !hasArrivals;
+    const zoneTapRefresh = canTapRefresh && hasArrivals;
     const maxVisible = this._config.max_arrivals ?? 5;
     const visibleArrivals = this._expanded ? arrivals : arrivals.slice(0, maxVisible);
     const hiddenCount =
@@ -296,7 +364,14 @@ export class HaTitsaCard extends LitElement {
     let bodyContent;
     if (!entityObj) {
       bodyContent = html`
-        <div class="state-box">
+        <div
+          class="state-box"
+          role=${cardTapRefresh ? "button" : nothing}
+          tabindex=${cardTapRefresh ? "0" : nothing}
+          aria-label=${cardTapRefresh ? localize(this.hass, "refresh") : nothing}
+          @click=${cardTapRefresh ? this._handleRefreshZoneClick : nothing}
+          @keydown=${cardTapRefresh ? this._handleRefreshZoneKeyDown : nothing}
+        >
           <ha-icon icon="mdi:bus-alert"></ha-icon>
           <div class="state-title">${localize(this.hass, "entity_missing_title")}</div>
           <div class="state-subtitle">${localize(this.hass, "entity_missing_subtitle")}</div>
@@ -346,7 +421,14 @@ export class HaTitsaCard extends LitElement {
       `;
     } else if (arrivals.length === 0) {
       bodyContent = html`
-        <div class="state-box">
+        <div
+          class="state-box"
+          role=${cardTapRefresh ? "button" : nothing}
+          tabindex=${cardTapRefresh ? "0" : nothing}
+          aria-label=${cardTapRefresh ? localize(this.hass, "refresh") : nothing}
+          @click=${cardTapRefresh ? this._handleRefreshZoneClick : nothing}
+          @keydown=${cardTapRefresh ? this._handleRefreshZoneKeyDown : nothing}
+        >
           <ha-icon icon="mdi:bus-clock"></ha-icon>
           <div class="state-title">${localize(this.hass, "empty_title")}</div>
           <div class="state-subtitle">${localize(this.hass, "empty_subtitle")}</div>
@@ -355,7 +437,7 @@ export class HaTitsaCard extends LitElement {
     } else {
       bodyContent = html`
         <ul class="arrivals ${this._config.compact ? "compact" : ""}">
-          ${visibleArrivals.map((arrival) => this._renderArrivalRow(arrival, locale))}
+          ${visibleArrivals.map((arrival) => this._renderArrivalRow(arrival, locale, openLineUrl))}
         </ul>
       `;
     }
@@ -372,16 +454,19 @@ export class HaTitsaCard extends LitElement {
         : this.hass?.themes?.darkMode === false
           ? "light"
           : "";
-    const cardClasses = [interactive ? "interactive" : "", themeClass].filter(Boolean).join(" ");
+    const cardClasses = [cardTapRefresh ? "card-interactive" : "", themeClass]
+      .filter(Boolean)
+      .join(" ");
 
     return html`
       <ha-card
         class=${cardClasses}
-        tabindex=${interactive ? "0" : "-1"}
-        @click=${this._handleCardClick}
-        @keydown=${this._handleCardKeyDown}
+        @click=${cardTapRefresh ? this._handleRefreshZoneClick : nothing}
       >
-        <div class="header ${style}">
+        <div
+          class="header ${style} ${canTapRefresh ? "refresh-zone" : ""}"
+          @click=${zoneTapRefresh ? this._handleRefreshZoneClick : nothing}
+        >
           <div class="header-left">
             <div class="bus-emblem">
               <ha-icon icon="mdi:bus"></ha-icon>
@@ -428,7 +513,10 @@ export class HaTitsaCard extends LitElement {
 
         ${showFooter
           ? html`
-              <div class="footer">
+              <div
+                class="footer ${canTapRefresh ? "refresh-zone" : ""}"
+                @click=${zoneTapRefresh ? this._handleRefreshZoneClick : nothing}
+              >
                 <div class="footer-left">
                   ${lastUpdateClock
                     ? html`<span>${localize(this.hass, "updated_at")} ${lastUpdateClock}</span>`

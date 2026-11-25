@@ -25,6 +25,7 @@ export class HaTitsaCardEditor extends LitElement {
       show_footer: true,
       tap_to_refresh: true,
       ...config,
+      open_line_url: config.open_line_url !== false,
     };
   }
 
@@ -107,6 +108,10 @@ export class HaTitsaCardEditor extends LitElement {
       },
       {
         name: "tap_to_refresh",
+        selector: { boolean: {} },
+      },
+      {
+        name: "open_line_url",
         selector: { boolean: {} },
       },
       {

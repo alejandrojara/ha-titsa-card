@@ -37,6 +37,24 @@ export function normalizeLineCode(raw: string): string {
   return cleaned;
 }
 
+export const TITSA_LINES_INDEX_URL =
+  "https://titsa.com/index.php/tus-guaguas/lineas-y-horarios";
+
+/**
+ * Build a safe titsa.com line info URL for a TITSA line code.
+ * Two-digit lines on titsa.com require a 3-digit zero-padded slug (e.g. "15" -> "linea-015").
+ * Non-numeric or special shuttle codes safely fall back to the lines index page.
+ */
+export function buildTitsaLineUrl(rawLine: string | null | undefined): string {
+  if (rawLine === null || rawLine === undefined) return TITSA_LINES_INDEX_URL;
+  const normalized = normalizeLineCode(String(rawLine));
+  if (!/^[1-9]\d{0,3}$/.test(normalized)) {
+    return TITSA_LINES_INDEX_URL;
+  }
+  const padded = normalized.padStart(3, "0");
+  return `${TITSA_LINES_INDEX_URL}/linea-${padded}`;
+}
+
 /** Format ALL-CAPS TITSA destinations cleanly into readable Title Case. */
 export function formatDestination(raw: string): string {
   const collapsed = raw

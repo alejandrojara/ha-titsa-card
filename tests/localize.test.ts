@@ -111,4 +111,20 @@ describe("localization", () => {
     expect(window.customCards[0].name).toBe("TITSA Bus Stop Card");
     expect(window.customCards[0].description).toContain("Unofficial bus-shelter marquee card");
   });
+
+  it("localizes open_line_url editor labels and line link accessibility strings in ES and EN", () => {
+    const hassEs = makeHass({ language: "es" });
+    const hassEn = makeHass({ language: "en" });
+
+    expect(localize(hassEs, "editor_open_line_url")).toBe(
+      "Abrir ficha de línea en titsa.com al pulsar",
+    );
+    expect(localize(hassEn, "editor_open_line_url")).toBe("Open line info on titsa.com on tap");
+    expect(localize(hassEs, "open_line_tooltip", { line: "15" })).toBe(
+      "Ver ficha de la línea 15 en titsa.com",
+    );
+    expect(localize(hassEn, "open_line_tooltip", { line: "15" })).toBe(
+      "View line 15 info on titsa.com",
+    );
+  });
 });

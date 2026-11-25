@@ -30,10 +30,15 @@ Tarjeta personalizada **no oficial** de Lovelace para **Home Assistant** con dis
   * **`minimal`:** cabecera limpia adaptada al tema nativo de Home Assistant (claro y oscuro).
 * **Configuración 100 % visual (sin YAML):** editor gráfico nativo (`<ha-form>`) con selector filtrado automáticamente a sensores de la integración `titsa` (compatible tanto con el sensor agregado `Próxima guagua` como con sensores individuales `Línea X`).
 * **Cuenta atrás viva en local:** recalcula los minutos localmente cada 15 s a partir de `estimated_arrival` sin generar peticiones extra a `titsa.com`, y soporta tiempos aproximados (`>60 min`) y hora estimada opcional (`HH:MM`).
-* **Refresco bajo demanda con detección automática:** descubre automáticamente el botón `button.<parada>_actualizar` del mismo dispositivo (sin depender del idioma ni del `entity_id`). Permite actualizar con un toque en el botón superior, tocando la tarjeta o desde el botón **«Consultar ahora»** cuando el sondeo está en pausa, mostrando un aviso integrado si el *cooldown* de 30 s está activo.
+* **Interacción contextual (ficha de línea + refresco):**
+  * Cuando se muestran llegadas, pulsar **toda la fila de una llegada** (marcada con un indicador sutil `›`) abre directamente la ficha oficial de esa línea en `titsa.com` en una nueva pestaña sin disparar refrescos ni consumir el *cooldown* de 30 s.
+  * Pulsar la **cabecera completa** (icono, título, `#código`, botón `↻`) o el **pie** (salvo `Ver N más`) actualiza los datos.
+  * En estado de reposo, pausa, sin llegadas o no disponible, pulsar **en cualquier parte de la tarjeta** actualiza los datos (si `tap_to_refresh` está activo).
+  * La navegación a `titsa.com` se controla con `open_line_url` (activa por defecto y desacoplada de `tap_to_refresh`), ideal para desactivarla en paneles kiosco o tablets de pared.
+* **Refresco bajo demanda con detección automática:** descubre automáticamente el botón `button.<parada>_actualizar` del mismo dispositivo (sin depender del idioma ni del `entity_id`). Permite actualizar desde la cabecera, el pie o el botón **«Consultar ahora»** cuando el sondeo está en pausa, mostrando un aviso integrado si el *cooldown* de 30 s está activo.
 * **Expansión sin recargar:** si hay más guaguas que `max_arrivals`, el enlace **`Ver N más`** despliega el resto sin disparar una nueva consulta.
 * **Preparada para vistas por Secciones (*Sections*):** implementa `getGridOptions()` y `getCardSize()`, localización automática en **español e inglés**, modo compacto y filtro opcional de líneas a nivel de tarjeta.
-* **Paquete único autocontenido:** un solo archivo ES module (`ha-titsa-card.js`, ~15 KB gzip) sin dependencias externas en tiempo de ejecución.
+* **Paquete único autocontenido:** un solo archivo ES module (`ha-titsa-card.js`, ~17 KB gzip) sin dependencias externas en tiempo de ejecución.
 
 ---
 
@@ -63,13 +68,26 @@ Necesitas tener instalada y configurada la integración comunitaria **[`alejandr
 
 ---
 
+## Interacción contextual
+
+| Estado / Zona | Acción al pulsar | Depende de |
+| :--- | :--- | :--- |
+| **Fila completa de llegada** (con `›`) | Abre la ficha de la línea en `titsa.com` en nueva pestaña (`linea-015`, `linea-905`, o índice general para lanzaderas especiales) sin consumir el *cooldown* | `open_line_url: true` |
+| **Cabecera completa** (icono, título, `#código`) | Actualiza la parada mediante `button.press` | `tap_to_refresh: true` |
+| **Botón `↻`** / **«Consultar ahora»** | Actualiza la parada mediante `button.press` | *(siempre activo si existe el botón)* |
+| **Pie** (hora de actualización / etiqueta `Manual`) | Actualiza la parada mediante `button.press` | `tap_to_refresh: true` |
+| **Enlace `Ver N más` / `Ver menos`** | Despliega o contrae la lista localmente sin refrescar | *(siempre activo)* |
+| **Tarjeta completa en reposo / pausa / sin llegadas / no disponible** | Actualiza la parada mediante `button.press` | `tap_to_refresh: true` |
+
+---
+
 ## Configuración
 
 ### Editor visual (recomendado)
 
 1. Edita tu panel de Home Assistant y pulsa **Añadir tarjeta**.
 2. Busca **`Tarjeta de parada TITSA`** *(o **`TITSA Bus Stop Card`** si usas Home Assistant en inglés)*.
-3. Selecciona tu sensor de parada TITSA y ajusta el estilo (`marquesina` o `minimal`), el número máximo de llegadas, el modo compacto, las líneas a mostrar o la hora estimada (`HH:MM`).
+3. Selecciona tu sensor de parada TITSA y ajusta el estilo (`marquesina` o `minimal`), el número máximo de llegadas, el modo compacto, las líneas a mostrar, la hora estimada (`HH:MM`) o el comportamiento al pulsar (`tap_to_refresh` y `open_line_url`).
 
 ### Configuración en YAML
 
@@ -83,9 +101,10 @@ max_arrivals: 5
 show_arrival_time: true
 show_footer: true
 tap_to_refresh: true
+open_line_url: true
 ```
 
-#### Ejemplo 2: Estilo minimalista compacto con filtro de líneas y descripción de ruta
+#### Ejemplo 2: Estilo minimalista compacto para panel kiosco / pared
 
 ```yaml
 type: custom:ha-titsa-card
@@ -100,6 +119,7 @@ lines:
   - "20"
 show_arrival_time: true
 show_route_name: true
+open_line_url: false
 ```
 
 ### Referencia de opciones
@@ -115,7 +135,8 @@ show_route_name: true
 | `show_arrival_time` | `boolean` | `false` | Muestra la hora estimada (`HH:MM`) bajo los minutos restantes. |
 | `show_route_name` | `boolean` | `false` | Muestra el nombre completo de la línea bajo el destino. |
 | `show_footer` | `boolean` | `true` | Muestra el pie con la hora de última estimación, etiqueta `Manual` y botón de expansión. |
-| `tap_to_refresh` | `boolean` | `true` | Permite pulsar cualquier zona libre de la tarjeta para invocar `button.press`. |
+| `tap_to_refresh` | `boolean` | `true` | Permite actualizar al pulsar la cabecera, el pie (salvo «Ver N más») o toda la tarjeta cuando no hay llegadas visibles. |
+| `open_line_url` | `boolean` | `true` | Abre la ficha oficial de la línea en `titsa.com` (nueva pestaña) al pulsar cualquier fila de llegada, mostrando un chevron `›` sutil. Desacoplada de `tap_to_refresh`; ponla a `false` en paneles kiosco/pared. |
 | `refresh_entity` | `string` | *(auto)* | Sobrescribe manualmente la entidad `button.*` usada al actualizar (por defecto se detecta por dispositivo o nombre). |
 
 ---
